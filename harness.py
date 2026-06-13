@@ -101,6 +101,53 @@ class RizinRE:
             else:
                 raise AnnotationError(f"unknown annotation kind: {kind!r}")
 
+    def _has_command(self, cmd_prefix: str) -> bool:
+        # `<cmd>?` prints help if the command exists; rizin 0.8.2 emits an
+        # "ERROR: ... command: <cmd>?" line when the command is unknown (and
+        # otherwise falls back to printing the parent prefix's help). Treat an
+        # error line or an empty reply as "absent".
+        out = self.session.cmd(f"{cmd_prefix}?")
+        if not out.strip():
+            return False
+        low = out.lower()
+        return "error" not in low and "unknown command" not in low
+
+    def decompile(self, addr: int) -> dict:
+        """Decompile a function; cross-check literals against raw bytes.
+
+        Tries rz-ghidra (pdg) then jsdec (pdd). Degrades cleanly if neither
+        is installed. Flags decompiled string literals not present in the
+        function's raw string references (decompiler-artifact guard).
+        """
+        code, decompiler = "", None
+        for cmd, name in (("pdg", "rz-ghidra"), ("pdd", "jsdec")):
+            if self._has_command(cmd):
+                out = self.session.cmd(f"{cmd} @ {addr}")
+                if out.strip():
+                    code, decompiler = out, name
+                    break
+        if decompiler is None:
+            return {
+                "available": False,
+                "decompiler": None,
+                "code": "no decompiler available (install rz-ghidra or jsdec)",
+                "mismatches": [],
+            }
+        # cross-check: literals in decompiled code vs raw string refs in the fn
+        raw_strings = {s.string for s in self.session.strings()}
+        import re as _re
+        literals = set(_re.findall(r'"([^"\\]{4,})"', code))
+        mismatches = sorted(
+            lit for lit in literals
+            if not any(lit in rs or rs in lit for rs in raw_strings)
+        )
+        return {
+            "available": True,
+            "decompiler": decompiler,
+            "code": code,
+            "mismatches": mismatches,
+        }
+
     def quit(self) -> None:
         self.session.quit()
 
