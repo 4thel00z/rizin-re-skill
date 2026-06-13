@@ -8,7 +8,8 @@ from __future__ import annotations
 import logging
 import os
 import platform
-from typing import Any, Optional
+import re
+from typing import Any
 
 from rzpipe.session import RizinSession
 
@@ -33,9 +34,11 @@ class RizinRE:
 
     # raw escape hatch -----------------------------------------------------
     def cmd(self, c: str) -> str:
+        log.info("raw cmd: %s", c)  # audit: every escape-hatch command (spec §7)
         return self.session.cmd(c)
 
     def cmdj(self, c: str) -> Any:
+        log.info("raw cmdj: %s", c)  # audit: every escape-hatch command (spec §7)
         return self.session.cmdj(c)
 
     # deterministic bulk verb ---------------------------------------------
@@ -141,8 +144,7 @@ class RizinRE:
             }
         # cross-check: literals in decompiled code vs raw string refs in the fn
         raw_strings = {s.string for s in self.session.strings()}
-        import re as _re
-        literals = set(_re.findall(r'"([^"\\]{4,})"', code))
+        literals = set(re.findall(r'"([^"\\]{4,})"', code))
         mismatches = sorted(
             lit for lit in literals
             if not any(lit in rs or rs in lit for rs in raw_strings)
