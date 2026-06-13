@@ -148,6 +148,30 @@ class RizinRE:
             "mismatches": mismatches,
         }
 
+    def emulate_function(self, addr: int, *, steps: int = 50) -> dict:
+        """Emulate from ``addr`` using RzIL (no native execution).
+
+        Returns supported=False with a note if the architecture lacks RzIL
+        uplift for these instructions, rather than emitting wrong results.
+        """
+        # Initialize RzIL VM; aezi resets it. If RzIL is unsupported for the
+        # arch, rizin reports an error string instead of initializing.
+        init = self.session.cmd(f"aezi @ {addr}")
+        if "not" in init.lower() and "support" in init.lower():
+            return {"supported": False, "steps_run": 0, "registers": {},
+                    "note": f"RzIL not supported for this architecture: {init.strip()}"}
+        self.session.cmd(f"s {addr}")
+        self.session.cmd("aezi")
+        ran = 0
+        for _ in range(steps):
+            out = self.session.cmd("aezse")  # step one RzIL instruction
+            ran += 1
+            if "invalid" in out.lower() or "error" in out.lower():
+                break
+        regs = self.session.cmdj("arj") or {}
+        return {"supported": True, "steps_run": ran,
+                "registers": regs, "note": "RzIL emulation, no native execution"}
+
     def quit(self) -> None:
         self.session.quit()
 
