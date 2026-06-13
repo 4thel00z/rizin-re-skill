@@ -12,6 +12,10 @@ from rzpipe.session import RizinSession
 
 log = logging.getLogger("rizin-re")
 
+
+class AnnotationError(Exception):
+    """An annotation plan referenced an address/flag that does not exist."""
+
 _STRING_LIMIT = 200
 _IMPORT_LIMIT = 200
 _MAP_LIMIT = 300
@@ -65,6 +69,37 @@ class RizinRE:
             })
         rows.sort(key=lambda r: r["score"], reverse=True)
         return rows[:_MAP_LIMIT]
+
+    def _addr_exists(self, addr: int) -> bool:
+        # fd resolves a flag/function at an address; empty result means nothing there
+        info = self.session.cmdj(f"afij @ {addr}") or []
+        if info:
+            return True
+        # fall back: is there a mapped flag or valid instruction here?
+        # rizin 0.8.2 emits a bare error token ("invalid"/"unaligned") at
+        # unmapped/unaligned addresses instead of a mnemonic.
+        disasm = (self.session.cmd(f"pi 1 @ {addr}") or "").strip().lower()
+        return bool(disasm) and "invalid" not in disasm and "unaligned" not in disasm
+
+    def annotate(self, plan: list[dict]) -> None:
+        """Validate every op's address, then apply all — or refuse the whole plan."""
+        for op in plan:
+            addr = op["addr"]
+            if not self._addr_exists(addr):
+                raise AnnotationError(
+                    f"address {addr:#x} does not resolve to code/function; "
+                    f"refusing entire plan (no partial apply)"
+                )
+        for op in plan:
+            addr, kind = op["addr"], op["kind"]
+            if kind == "rename":
+                self.session.cmd(f"afn {op['name']} @ {addr}")
+            elif kind == "comment":
+                self.session.cmd(f"CC {op['text']} @ {addr}")
+            elif kind == "var_rename":
+                self.session.cmd(f"afvn {op['new']} {op['old']} @ {addr}")
+            else:
+                raise AnnotationError(f"unknown annotation kind: {kind!r}")
 
     def quit(self) -> None:
         self.session.quit()
