@@ -6,6 +6,8 @@ Exploratory work uses the raw ``cmd``/``cmdj`` escape hatch (see reference docs)
 from __future__ import annotations
 
 import logging
+import os
+import platform
 from typing import Any, Optional
 
 from rzpipe.session import RizinSession
@@ -15,6 +17,10 @@ log = logging.getLogger("rizin-re")
 
 class AnnotationError(Exception):
     """An annotation plan referenced an address/flag that does not exist."""
+
+
+class SandboxError(Exception):
+    """Tier-2 native debug attempted outside an authorized sandbox."""
 
 _STRING_LIMIT = 200
 _IMPORT_LIMIT = 200
@@ -171,6 +177,27 @@ class RizinRE:
         regs = self.session.cmdj("arj") or {}
         return {"supported": True, "steps_run": ran,
                 "registers": regs, "note": "RzIL emulation, no native execution"}
+
+    def debug_session(self, *, human_ack: bool) -> "RizinRE":
+        """Gate for Tier-2 native debugging. Refuses unless explicitly authorized.
+
+        Requires BOTH an env confirmation (RIZIN_RE_SANDBOX_CONFIRMED=1) and a
+        per-call human acknowledgement. On macOS, refuses outright: Firecracker/
+        gVisor are Linux-only (see reference/debug-sandbox.md).
+        """
+        if platform.system() == "Darwin":
+            raise SandboxError(
+                "native debug refused on macOS: run the skill inside a disposable "
+                "Linux VM (see reference/debug-sandbox.md); no turnkey sandbox here"
+            )
+        if os.environ.get("RIZIN_RE_SANDBOX_CONFIRMED") != "1":
+            raise SandboxError(
+                "set RIZIN_RE_SANDBOX_CONFIRMED=1 only inside an isolated sandbox "
+                "(microVM/gVisor, default-deny egress) before native debugging"
+            )
+        if not human_ack:
+            raise SandboxError("explicit human acknowledgement required for Tier-2 debug")
+        return self  # caller may now drive dc/ds/dr via raw cmd()
 
     def quit(self) -> None:
         self.session.quit()
