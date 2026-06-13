@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so `from harness import RizinRE` resolves
+# regardless of how pytest is invoked (`pytest tests/` or `python -m pytest tests/`).
+pythonpath = ["."]
+testpaths = ["tests"]
