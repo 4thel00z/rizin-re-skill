@@ -14,6 +14,7 @@ log = logging.getLogger("rizin-re")
 
 _STRING_LIMIT = 200
 _IMPORT_LIMIT = 200
+_MAP_LIMIT = 300
 
 
 class RizinRE:
@@ -50,6 +51,20 @@ class RizinRE:
             "entrypoint": entrypoint,
             "function_count": len(funcs),
         }
+
+    def map_functions(self) -> list[dict]:
+        """Rank functions by a triage score: size + xref + call-density."""
+        rows = []
+        for f in self.session.functions():
+            xrefs = len(self.session.cmdj(f"axtj @ {f.offset}") or [])
+            calls = len(self.session.cmdj(f"axfj @ {f.offset}") or [])
+            score = f.size + xrefs * 10 + calls * 2
+            rows.append({
+                "name": f.name, "offset": f.offset, "size": f.size,
+                "xrefs": xrefs, "calls": calls, "score": score,
+            })
+        rows.sort(key=lambda r: r["score"], reverse=True)
+        return rows[:_MAP_LIMIT]
 
     def quit(self) -> None:
         self.session.quit()
