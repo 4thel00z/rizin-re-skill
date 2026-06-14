@@ -47,9 +47,12 @@ Tested against **rizin 0.8.2**. Driven from Python — no interactive rizin shel
   `strings`, `sections`, `entrypoint`, `function_count`. **Run first.**
 - `map_functions()` → functions ranked by triage score
   (`size + xrefs*10 + calls*2`), each row `{name, offset, size, xrefs, calls, score}`.
-- `decompile(addr)` → `{available, decompiler, code, mismatches}`. `mismatches`
+- `decompile(addr)` → `{available, decompiler, code, annotations, mismatches}`.
+  `annotations` (from rz-ghidra's `pdgj` JSON) maps character ranges in `code`
+  to binary addresses; `[]` when the text fallback or jsdec is used. `mismatches`
   are decompiled string literals absent from the binary's raw strings —
-  **investigate them; they may be decompiler artifacts.** Degrades to
+  **investigate them; they may be decompiler artifacts.** rz-ghidra is the
+  preferred decompiler (harness tries `pdgj` first). Degrades to
   `available: False` if no decompiler plugin is installed.
 - `emulate_function(addr, *, steps=50)` → `{supported, steps_run, registers, note}`.
   RzIL only. `supported=False` (with a `note`) if the arch lacks RzIL uplift.

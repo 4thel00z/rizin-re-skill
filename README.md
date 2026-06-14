@@ -18,10 +18,14 @@ Tested against **rizin 0.8.2**.
 - The **`rzpipe`** Python package (the modernized `RizinSession` client this
   skill dogfoods).
 - Optional, for decompilation: a decompiler plugin. Neither is guaranteed on
-  0.8.2 — install one with the rizin package manager:
+  0.8.2. **rz-ghidra is preferred** — it gives higher-quality output and its
+  `pdgj` JSON lets `decompile()` return an `annotations` list mapping decompiled
+  tokens to binary addresses. On macOS arm64 + Homebrew, rz-ghidra must be built
+  from source (see `reference/decompilation.md` for the exact cmake recipe).
+  jsdec is the lighter, no-build alternative:
   ```bash
-  rz-pm install jsdec        # lightweight fallback (pdd)
-  rz-pm install rz-ghidra    # preferred, higher quality (pdg)
+  rz-pm install jsdec        # lightweight fallback (pdd / pddj)
+  # rz-ghidra: build from source — see reference/decompilation.md
   ```
   Without a plugin, `decompile()` degrades to `available: False` instead of
   failing.
