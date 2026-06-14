@@ -124,22 +124,43 @@ class RizinRE:
     def decompile(self, addr: int) -> dict:
         """Decompile a function; cross-check literals against raw bytes.
 
-        Tries rz-ghidra (pdg) then jsdec (pdd). Degrades cleanly if neither
-        is installed. Flags decompiled string literals not present in the
-        function's raw string references (decompiler-artifact guard).
+        Prefers rz-ghidra's structured JSON (`pdgj`), falling back to its text
+        form (`pdg`), then jsdec (`pddj`/`pdd`). Degrades cleanly to
+        ``available: False`` if no decompiler plugin is installed. Flags
+        decompiled string literals not present in the function's raw string
+        references (decompiler-artifact guard).
         """
-        code, decompiler = "", None
-        for cmd, name in (("pdg", "rz-ghidra"), ("pdd", "jsdec")):
-            if self._has_command(cmd):
-                out = self.session.cmd(f"{cmd} @ {addr}")
-                if out.strip():
-                    code, decompiler = out, name
-                    break
+        code, decompiler, annotations = "", None, []
+        # (probe_cmd, emit_cmd_json, emit_cmd_text, name)
+        backends = (
+            ("pdg", "pdgj", "pdg", "rz-ghidra"),
+            ("pdd", "pddj", "pdd", "jsdec"),
+        )
+        for probe, jcmd, tcmd, name in backends:
+            if not self._has_command(probe):
+                continue
+            # Try structured JSON first.
+            try:
+                j = self.session.cmdj(f"{jcmd} @ {addr}")
+            except Exception:  # noqa: BLE001 - bad/again-unsupported JSON -> text fallback
+                j = None
+            if isinstance(j, dict) and j.get("code"):
+                code = j["code"]
+                annotations = j.get("annotations", []) or []
+                decompiler = name
+                break
+            # Fall back to text output.
+            out = self.session.cmd(f"{tcmd} @ {addr}")
+            if out.strip():
+                code, decompiler = out, name
+                break
         if decompiler is None:
             return {
                 "available": False,
                 "decompiler": None,
-                "code": "no decompiler available (install rz-ghidra or jsdec)",
+                "code": "no decompiler available (install rz-ghidra: see "
+                        "reference/decompilation.md, or jsdec via rz-pm)",
+                "annotations": [],
                 "mismatches": [],
             }
         # cross-check: literals in decompiled code vs raw string refs in the fn
@@ -153,6 +174,7 @@ class RizinRE:
             "available": True,
             "decompiler": decompiler,
             "code": code,
+            "annotations": annotations,
             "mismatches": mismatches,
         }
 
