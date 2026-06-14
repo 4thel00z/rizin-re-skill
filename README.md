@@ -1,13 +1,16 @@
 # rizin-re
 
-A shareable Claude Code skill for general reverse-engineering comprehension —
-understanding what a binary does. It drives a long-lived [rizin](https://rizin.re)
-session from Python through a small, typed harness: triage, function mapping,
-xref/call-graph navigation, decompilation, RzIL emulation, and annotation.
+Hand Claude a binary and ask what it does. This skill gives it a live
+[rizin](https://rizin.re) session to reason in — triage, function maps,
+cross-references, decompilation, emulation, and annotation — so the analysis
+builds up across steps instead of evaporating between one-shot commands.
 
-The skill is hybrid by design: deterministic, safety-critical operations live in
-`harness.py`; everything exploratory is driven through a raw `cmd`/`cmdj` escape
-hatch, guided by the recipes in `reference/*.md`.
+The design is hybrid. Operations that must stay safe or deterministic are typed
+verbs in `harness.py`; open-ended exploration runs through a raw `cmd`/`cmdj`
+escape hatch, guided by the recipes in `reference/*.md`. Untrusted input stays
+untrusted: static analysis is the default, RzIL emulation never runs native
+code, and the debugger is refused unless you opt in (and refused outright on
+macOS).
 
 Tested against **rizin 0.8.2**.
 
